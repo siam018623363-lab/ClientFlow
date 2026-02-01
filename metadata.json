@@ -1,0 +1,7 @@
+{
+  "name": "Copy of ClientFlow Pro",
+  "description": "A comprehensive Business & Client Management SaaS featuring real-time analytics, project tracking, and financial management for agencies and freelancers.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
