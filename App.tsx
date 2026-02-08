@@ -203,23 +203,25 @@ function App() {
           <Route path="/verify" element={<Verify />} />
           <Route path="/*" element={
             <ProtectedRoute>
-              <div className="flex min-h-screen bg-slate-50">
+              <div className="flex min-h-screen bg-slate-50 w-full max-w-full overflow-x-hidden relative">
                 <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
-                <div className="flex-1 flex flex-col min-w-0">
+                <div className="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
                   <Header onMenuClick={() => setIsMobileOpen(true)} />
-                  <main className="flex-1 overflow-x-hidden">
-                    <Routes>
-                      <Route path="/dashboard" element={<Dashboard />} />
-                      <Route path="/clients" element={<Clients />} />
-                      <Route path="/projects" element={<Projects />} />
-                      <Route path="/tasks" element={<Tasks />} />
-                      <Route path="/sales" element={<Sales />} />
-                      <Route path="/payments" element={<Payments />} />
-                      <Route path="/targets" element={<Targets />} />
-                      <Route path="/services" element={<Services />} />
-                      <Route path="/settings" element={<Settings />} />
-                      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                    </Routes>
+                  <main className="flex-1 overflow-x-hidden w-full">
+                    <div className="w-full max-w-full overflow-x-hidden px-0">
+                      <Routes>
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/clients" element={<Clients />} />
+                        <Route path="/projects" element={<Projects />} />
+                        <Route path="/tasks" element={<Tasks />} />
+                        <Route path="/sales" element={<Sales />} />
+                        <Route path="/payments" element={<Payments />} />
+                        <Route path="/targets" element={<Targets />} />
+                        <Route path="/services" element={<Services />} />
+                        <Route path="/settings" element={<Settings />} />
+                        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                      </Routes>
+                    </div>
                   </main>
                 </div>
               </div>
