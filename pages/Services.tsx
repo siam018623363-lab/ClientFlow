@@ -2,79 +2,134 @@
 import React, { useState } from 'react';
 import { useApp } from '../App';
 import { Service } from '../types';
+import { supabase } from '../lib/supabase';
+import { Plus, Trash2, Layers, Tag, DollarSign, X, Briefcase } from 'lucide-react';
 
 const Services: React.FC = () => {
-  const { language, services, setServices } = useApp();
+  const { language, services, refreshData } = useApp();
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState<Partial<Service>>({ price: 0 });
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState<Partial<Service>>({ name: '', bnName: '', price: 0, description: '' });
 
-  const handleSave = () => {
-    if (!formData.name) return;
-    const service: Service = {
-      ...formData as Service,
-      id: Math.random().toString(36).substr(2, 9),
-    };
-    setServices([...services, service]);
-    setShowModal(false);
+  const handleSave = async () => {
+    if (!formData.name) {
+      alert("Please provide service name");
+      return;
+    }
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    setIsSaving(true);
+    try {
+      const payload = { 
+        name: formData.name,
+        bnName: formData.bnName || formData.name,
+        price: Number(formData.price || 0),
+        description: formData.description || '',
+        user_id: session.user.id 
+      };
+      
+      const { error } = await supabase.from('services').insert([payload]);
+      if (error) throw error;
+      
+      await refreshData();
+      setShowModal(false);
+      setFormData({ name: '', bnName: '', price: 0, description: '' });
+    } catch (err: any) {
+      alert("Error saving service: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const deleteService = async (id: string) => {
+    if (confirm(language === 'bn' ? 'সার্ভিসটি কি ডিলিট করতে চান?' : 'Delete service?')) {
+      await supabase.from('services').delete().eq('id', id);
+      await refreshData();
+    }
   };
 
   return (
-    <div className="p-6 lg:p-10 space-y-8 max-w-[1600px] mx-auto">
-      <div className="flex justify-between items-end">
+    <div className="p-6 md:p-10 lg:p-14 space-y-10 max-w-[1600px] mx-auto animate-fade-in">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div>
-          <h1 className={`text-3xl font-bold text-slate-800 ${language === 'bn' ? 'font-bengali' : 'font-english'}`}>{language === 'en' ? 'Services' : 'সার্ভিস'}</h1>
-          <p className="text-slate-500">Define what you offer</p>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-800 font-bengali tracking-tight">সার্ভিস ক্যাটালগ</h1>
+          <p className="text-slate-400 text-sm md:text-base font-medium mt-1">আপনার সব অফার করা সার্ভিস এবং প্যাকেজসমূহ</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="bg-violet-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg">
-          {language === 'bn' ? 'সার্ভিস যুক্ত করুন' : 'New Service'}
+        <button onClick={() => setShowModal(true)} className="bg-[#007E6E] text-white px-8 py-3.5 rounded-2xl font-black shadow-2xl shadow-[#007E6E]/20 hover:brightness-110 active:scale-95 transition-all text-sm flex items-center gap-3">
+          <Plus size={20} /> নতুন সার্ভিস
         </button>
       </div>
 
-      {services.length === 0 ? (
-        <div className="bg-white rounded-[3rem] border border-slate-100 p-20 flex flex-col items-center justify-center text-center">
-           <div className="w-20 h-20 bg-violet-50 text-violet-200 rounded-full flex items-center justify-center mb-6">
-              <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-           </div>
-           <h3 className={`text-xl font-bold text-slate-800 mb-2 ${language === 'bn' ? 'font-bengali' : 'font-english'}`}>
-             {language === 'bn' ? 'কোনো সার্ভিস নেই' : 'No Services Defined'}
-           </h3>
-           <p className={`text-slate-500 mb-8 max-w-xs ${language === 'bn' ? 'font-bengali' : 'font-english'}`}>
-             {language === 'bn' ? 'আপনি যেসব সেবা প্রদান করেন সেগুলো এখানে তালিকাভুক্ত করুন।' : 'List the services you offer to your clients here.'}
-           </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {services.map(s => (
-            <div key={s.id} className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm hover:shadow-xl transition-all group">
-               <div className="w-12 h-12 bg-violet-50 text-violet-600 rounded-2xl flex items-center justify-center mb-6">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.638.319a2 2 0 01-.894.223h-.547a2 2 0 01-1.32-.512l-2.01-1.73a2 2 0 010-3.04l2.01-1.73a2 2 0 011.32-.512h.547a2 2 0 01.894.223l.638.319a6 6 0 003.86.517l2.387-.477a2 2 0 001.022-.547l.348-.348a2 2 0 013.207 2.396l-.348.348z" /></svg>
-               </div>
-               <h3 className={`text-xl font-bold text-slate-800 mb-2 ${language === 'bn' ? 'font-bengali' : 'font-english'}`}>{language === 'bn' ? s.bnName : s.name}</h3>
-               <p className={`text-slate-500 text-sm mb-6 ${language === 'bn' ? 'font-bengali' : 'font-english'}`}>{s.description}</p>
-               <div className="flex justify-between items-center pt-6 border-t border-slate-50">
-                  <span className="text-2xl font-bold text-slate-800 font-english">৳{s.price.toLocaleString()}</span>
-                  <button onClick={() => setServices(services.filter(srv => srv.id !== s.id))} className="text-slate-300 hover:text-rose-500 transition-colors">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                  </button>
-               </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 md:gap-10">
+        {services.length === 0 ? (
+          <div className="col-span-full py-32 bg-white rounded-[3rem] border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm">
+             <div className="w-24 h-24 bg-slate-50 text-slate-200 rounded-full flex items-center justify-center mb-8"><Briefcase size={48} /></div>
+             <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">No services listed yet.</p>
+          </div>
+        ) : services.map(s => (
+          <div key={s.id} className="bg-white p-10 rounded-[3rem] border border-slate-50 shadow-sm hover:shadow-premium transition-all duration-500 group relative overflow-hidden">
+             <div className="absolute top-0 right-0 w-32 h-32 bg-[#007E6E]/5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
+             <div className="w-16 h-16 bg-gradient-to-br from-[#007E6E] to-[#00524a] text-white rounded-[1.8rem] flex items-center justify-center mb-10 shadow-xl group-hover:rotate-6 transition-transform">
+                <Layers size={28} />
+             </div>
+             <h3 className="text-2xl font-black text-slate-800 mb-4 font-bengali tracking-tight">{language === 'bn' ? s.bnName : s.name}</h3>
+             <p className="text-slate-500 text-sm md:text-base mb-10 leading-relaxed font-medium line-clamp-3">{s.description || 'No description provided.'}</p>
+             
+             <div className="flex justify-between items-center pt-8 border-t border-slate-50 relative">
+                <div className="space-y-1">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] font-english">Price Start</p>
+                   <span className="text-3xl font-black text-slate-800 font-english tabular-nums">৳{s.price.toLocaleString()}</span>
+                </div>
+                <button onClick={() => deleteService(s.id)} className="p-3 text-slate-300 hover:text-rose-500 bg-slate-50 hover:bg-rose-50 rounded-2xl transition-all">
+                  <Trash2 size={20} />
+                </button>
+             </div>
+          </div>
+        ))}
+      </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl">
-            <h2 className="text-2xl font-bold mb-6">New Service</h2>
-            <div className="space-y-4">
-               <input type="text" placeholder="Service Name (English)" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl" onChange={e => setFormData({...formData, name: e.target.value})} />
-               <input type="text" placeholder="সার্ভিসের নাম (বাংলা)" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bengali" onChange={e => setFormData({...formData, bnName: e.target.value})} />
-               <input type="number" placeholder="Price" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-english" onChange={e => setFormData({...formData, price: Number(e.target.value)})} />
-               <textarea placeholder="Description" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl h-24" onChange={e => setFormData({...formData, description: e.target.value})} />
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-xl rounded-[3rem] p-10 md:p-14 shadow-premium relative">
+            <div className="flex justify-between items-center mb-10">
+              <h2 className="text-2xl md:text-3xl font-black text-slate-800 font-bengali tracking-tight">নতুন সার্ভিস</h2>
+              <button onClick={() => setShowModal(false)} className="p-3 text-slate-300 hover:text-rose-500 bg-slate-50 rounded-2xl transition-all"><X size={24} /></button>
             </div>
-            <div className="flex gap-4 mt-8">
-              <button onClick={() => setShowModal(false)} className="flex-1 py-3 bg-slate-100 rounded-xl font-bold">Cancel</button>
-              <button onClick={handleSave} className="flex-1 py-3 bg-violet-600 text-white rounded-xl font-bold">Create Service</button>
+            
+            <div className="space-y-6">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">Service Name (EN)</label>
+                    <input type="text" placeholder="Web Development" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:bg-white focus:ring-4 focus:ring-[#007E6E]/5 transition-all font-english font-bold text-slate-700" onChange={e => setFormData({...formData, name: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">সার্ভিসের নাম (বাংলা)</label>
+                    <input type="text" placeholder="ওয়েব ডেভেলপমেন্ট" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:bg-white focus:ring-4 focus:ring-[#007E6E]/5 transition-all font-bengali font-bold text-slate-700" onChange={e => setFormData({...formData, bnName: e.target.value})} />
+                  </div>
+               </div>
+               
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">Base Price (৳)</label>
+                  <input type="number" placeholder="5000" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:bg-white focus:ring-4 focus:ring-[#007E6E]/5 transition-all font-english font-bold text-slate-700" onChange={e => setFormData({...formData, price: Number(e.target.value)})} />
+               </div>
+
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">Description</label>
+                  <textarea placeholder="Tell more about this service..." className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:bg-white focus:ring-4 focus:ring-[#007E6E]/5 transition-all font-english font-medium text-slate-700 h-32" onChange={e => setFormData({...formData, description: e.target.value})} />
+               </div>
+            </div>
+            
+            <div className="flex gap-5 mt-12 relative">
+              <button onClick={() => setShowModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-200 transition-all">বাতিল</button>
+              <button 
+                onClick={handleSave} 
+                disabled={isSaving}
+                className="flex-1 py-4 bg-gradient-to-r from-[#007E6E] to-[#00524a] text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-2xl shadow-[#007E6E]/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                {isSaving ? <div className="animate-spin h-5 w-5 border-2 border-white/30 border-t-white rounded-full"></div> : 'তৈরি করুন'}
+              </button>
             </div>
           </div>
         </div>

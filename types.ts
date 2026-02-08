@@ -13,6 +13,13 @@ export interface UserProfile {
   avatar: string;
 }
 
+export interface ContactLog {
+  id: string;
+  date: string;
+  note: string;
+  action: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -31,6 +38,8 @@ export interface Client {
   phone: string;
   status: ClientStatus;
   revenue: number;
+  join_date: string; 
+  contact_logs?: ContactLog[];
 }
 
 export interface Project {
@@ -51,7 +60,7 @@ export interface Payment {
   amount: number;
   date: string;
   method: PaymentMethod;
-  details: string; // Phone number or account number or card last 4
+  details: string; 
   status: 'সম্পন্ন' | 'পেন্ডিং' | 'ব্যর্থ';
 }
 
@@ -61,7 +70,7 @@ export interface Sale {
   clientId: string;
   amount: number;
   date: string;
-  status: 'পরিশোধিত' | 'বকেয়া';
+  status: 'পরিশোধিত' | 'পেন্ডিং' | 'বাকি';
 }
 
 export interface Service {

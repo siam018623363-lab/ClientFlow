@@ -2,68 +2,116 @@
 import React, { useState } from 'react';
 import { useApp } from '../App';
 import { Target } from '../types';
+import { supabase } from '../lib/supabase';
+import { Plus, Trash2, Target as TargetIcon, X, ArrowRight, Trophy } from 'lucide-react';
 
 const Targets: React.FC = () => {
-  const { language, targets, setTargets } = useApp();
+  const { language, targets, refreshData } = useApp();
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState<Partial<Target>>({ goal: 0, current: 0 });
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState<Partial<Target>>({ 
+    title: '', 
+    goal: 0, 
+    current: 0, 
+    deadline: new Date().toISOString().split('T')[0] 
+  });
 
-  const handleSave = () => {
-    if (!formData.title || !formData.goal) return;
-    const target: Target = {
-      ...formData as Target,
-      id: Math.random().toString(36).substr(2, 9),
-    };
-    setTargets([...targets, target]);
-    setShowModal(false);
+  const handleSave = async () => {
+    if (!formData.title || !formData.goal) {
+      alert(language === 'bn' ? 'টাইটেল এবং লক্ষ্যমাত্রা দিন' : 'Please provide title and goal');
+      return;
+    }
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    setIsSaving(true);
+    try {
+      const payload = { 
+        title: formData.title,
+        goal: Number(formData.goal),
+        current: Number(formData.current || 0),
+        deadline: formData.deadline,
+        user_id: session.user.id 
+      };
+      
+      const { error } = await supabase.from('targets').insert([payload]);
+      if (error) throw error;
+      
+      await refreshData();
+      setShowModal(false);
+      setFormData({ title: '', goal: 0, current: 0, deadline: new Date().toISOString().split('T')[0] });
+    } catch (err: any) {
+      alert("Error saving target: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const deleteTarget = (id: string) => {
-    if (confirm('Delete target?')) setTargets(targets.filter(t => t.id !== id));
+  const deleteTarget = async (id: string) => {
+    if (confirm(language === 'bn' ? 'টার্গেটটি কি ডিলিট করতে চান?' : 'Delete target?')) {
+      await supabase.from('targets').delete().eq('id', id);
+      await refreshData();
+    }
   };
 
   return (
-    <div className="p-6 lg:p-10 space-y-8 max-w-[1600px] mx-auto">
-      <div className="flex justify-between items-end">
+    <div className="p-6 md:p-10 lg:p-14 space-y-10 max-w-[1600px] mx-auto animate-fade-in">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div>
-          <h1 className={`text-3xl font-bold text-slate-800 ${language === 'bn' ? 'font-bengali' : 'font-english'}`}>{language === 'en' ? 'Targets' : 'টার্গেট'}</h1>
-          <p className="text-slate-500">Track your business milestones</p>
+          <h1 className={`text-3xl md:text-4xl font-black text-slate-800 tracking-tight ${language === 'bn' ? 'font-bengali' : 'font-english'}`}>
+            {language === 'en' ? 'Growth Goals' : 'ব্যবসায়িক লক্ষ্যমাত্রা'}
+          </h1>
+          <p className="text-slate-400 text-sm md:text-base font-medium mt-1">আপনার আয়ের লক্ষ্যমাত্রা এবং প্রগতি ট্র্যাক করুন</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="bg-amber-500 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg">
-          {language === 'bn' ? 'টার্গেট যুক্ত করুন' : 'New Target'}
+        <button onClick={() => setShowModal(true)} className="bg-[#007E6E] text-white px-8 py-3.5 rounded-2xl font-black shadow-2xl shadow-[#007E6E]/20 hover:brightness-110 active:scale-95 transition-all text-sm flex items-center gap-3">
+          <Plus size={20} /> {language === 'bn' ? 'টার্গেট যোগ করুন' : 'Create Target'}
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {targets.map(t => {
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 md:gap-10">
+        {targets.length === 0 ? (
+          <div className="col-span-full py-32 bg-white rounded-[3rem] border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm">
+             <div className="w-24 h-24 bg-slate-50 text-slate-200 rounded-full flex items-center justify-center mb-8"><TargetIcon size={48} /></div>
+             <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">No growth targets set yet.</p>
+          </div>
+        ) : targets.map(t => {
           const progress = Math.min(100, (t.current / t.goal) * 100);
           return (
-            <div key={t.id} className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm relative group">
-               <button onClick={() => deleteTarget(t.id)} className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-rose-500">
-                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            <div key={t.id} className="bg-white p-8 md:p-10 rounded-[3rem] border border-slate-50 shadow-sm relative group hover:shadow-premium transition-all duration-500 overflow-hidden">
+               <div className="absolute top-0 right-0 w-32 h-32 bg-[#007E6E]/5 rounded-bl-full group-hover:scale-110 transition-transform"></div>
+               <button onClick={() => deleteTarget(t.id)} className="absolute top-8 right-8 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all p-2 bg-slate-50 rounded-xl">
+                 <Trash2 size={18} />
                </button>
-               <h3 className={`text-lg font-bold text-slate-800 mb-6 ${language === 'bn' ? 'font-bengali' : 'font-english'}`}>{t.title}</h3>
-               <div className="space-y-4">
-                  <div className="flex justify-between text-xs font-bold text-slate-400 font-english">
-                     <span>Progress</span>
-                     <span>{progress.toFixed(0)}%</span>
+               
+               <div className="flex items-center gap-4 mb-8">
+                  <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shadow-sm"><Trophy size={24} /></div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800 font-bengali tracking-tight leading-none">{t.title}</h3>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2 font-english">Due: {t.deadline}</p>
                   </div>
-                  <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                     <div className="h-full bg-amber-500 rounded-full transition-all duration-1000" style={{ width: `${progress}%` }}></div>
+               </div>
+
+               <div className="space-y-6">
+                  <div>
+                    <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 font-english">
+                       <span>Progress</span>
+                       <span className="text-[#007E6E]">{progress.toFixed(1)}%</span>
+                    </div>
+                    <div className="h-4 bg-slate-100 rounded-full overflow-hidden p-1 ring-1 ring-slate-100">
+                       <div className="h-full bg-gradient-to-r from-[#007E6E] to-[#40b0a5] rounded-full transition-all duration-1000 shadow-glow" style={{ width: `${progress}%` }}></div>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-end pt-4 font-english">
+
+                  <div className="flex justify-between items-end pt-6 border-t border-slate-50">
                     <div>
-                      <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Current</p>
-                      <p className="text-xl font-bold text-slate-800">৳{t.current.toLocaleString()}</p>
+                      <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest mb-1">Current</p>
+                      <p className="text-2xl font-black text-[#007E6E] font-english">৳{t.current.toLocaleString()}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Goal</p>
-                      <p className="text-xl font-bold text-slate-400">৳{t.goal.toLocaleString()}</p>
+                      <p className="text-[10px] uppercase font-black text-slate-300 tracking-widest mb-1">Goal</p>
+                      <p className="text-lg font-bold text-slate-300 font-english">৳{t.goal.toLocaleString()}</p>
                     </div>
-                  </div>
-                  <div className="pt-4 flex items-center gap-2 text-xs font-bold text-slate-400 font-english">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                    Deadline: {t.deadline}
                   </div>
                </div>
             </div>
@@ -72,18 +120,41 @@ const Targets: React.FC = () => {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl">
-            <h2 className="text-2xl font-bold mb-6">Create Target</h2>
-            <div className="space-y-4">
-               <input type="text" placeholder="Target Title" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl" onChange={e => setFormData({...formData, title: e.target.value})} />
-               <input type="number" placeholder="Goal Amount" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl" onChange={e => setFormData({...formData, goal: Number(e.target.value)})} />
-               <input type="number" placeholder="Starting Current" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl" onChange={e => setFormData({...formData, current: Number(e.target.value)})} />
-               <input type="date" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-english" onChange={e => setFormData({...formData, deadline: e.target.value})} />
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-md rounded-[3rem] p-10 md:p-14 shadow-premium relative">
+            <div className="flex justify-between items-center mb-10">
+              <h2 className="text-2xl md:text-3xl font-black text-slate-800 font-bengali tracking-tight">নতুন লক্ষ্যমাত্রা</h2>
+              <button onClick={() => setShowModal(false)} className="p-3 text-slate-300 hover:text-rose-500 bg-slate-50 rounded-2xl transition-all"><X size={24} /></button>
             </div>
-            <div className="flex gap-4 mt-8">
-              <button onClick={() => setShowModal(false)} className="flex-1 py-3 bg-slate-100 rounded-xl font-bold">Cancel</button>
-              <button onClick={handleSave} className="flex-1 py-3 bg-amber-500 text-white rounded-xl font-bold shadow-lg shadow-amber-500/20">Save Target</button>
+            
+            <div className="space-y-6">
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">Target Title</label>
+                  <input type="text" placeholder="Monthly Sales Target" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:bg-white focus:ring-4 focus:ring-[#007E6E]/5 transition-all font-english font-bold text-slate-700" onChange={e => setFormData({...formData, title: e.target.value})} />
+               </div>
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">Goal Amount (৳)</label>
+                  <input type="number" placeholder="50000" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:bg-white focus:ring-4 focus:ring-[#007E6E]/5 transition-all font-english font-bold text-slate-700" onChange={e => setFormData({...formData, goal: Number(e.target.value)})} />
+               </div>
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">Starting Balance</label>
+                  <input type="number" placeholder="0" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:bg-white focus:ring-4 focus:ring-[#007E6E]/5 transition-all font-english font-bold text-slate-700" onChange={e => setFormData({...formData, current: Number(e.target.value)})} />
+               </div>
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">Deadline</label>
+                  <input type="date" value={formData.deadline} className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:bg-white transition-all font-english font-bold text-slate-700" onChange={e => setFormData({...formData, deadline: e.target.value})} />
+               </div>
+            </div>
+            
+            <div className="flex gap-5 mt-12">
+              <button onClick={() => setShowModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-200 transition-all">বাতিল</button>
+              <button 
+                onClick={handleSave} 
+                disabled={isSaving}
+                className="flex-1 py-4 bg-gradient-to-r from-[#007E6E] to-[#00524a] text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-2xl shadow-[#007E6E]/20 hover:brightness-110 transition-all flex items-center justify-center gap-2"
+              >
+                {isSaving ? <div className="animate-spin h-5 w-5 border-2 border-white/30 border-t-white rounded-full"></div> : 'তৈরি করুন'}
+              </button>
             </div>
           </div>
         </div>
